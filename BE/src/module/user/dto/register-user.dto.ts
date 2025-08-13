@@ -6,14 +6,19 @@ import { IsString, IsInt, IsEmail, MinLength, MaxLength, IsNotEmpty } from 'clas
 export class RegisterUserDto {
     @IsString()
     @IsNotEmpty()
-    userName: string;
+    name: string;
 
-    @IsString()
-    dateOfBirth: string;
+    @IsInt()
+    @IsNotEmpty()
+    age: number;
 
     @IsString()
     @IsNotEmpty()
-    address: string;
+    region: string;
+
+    @IsString()
+    @IsNotEmpty()
+    gender: string;
 
     @IsString()
     @IsNotEmpty()
