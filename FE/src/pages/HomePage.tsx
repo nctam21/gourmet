@@ -6,7 +6,7 @@ type FoodItem = {
     id?: string;
     name: string;
     description: string;
-    imageURL?: string;
+    image_url?: string;
     price?: number;
     region?: string;
     type?: string;
@@ -46,6 +46,7 @@ const HomePage: React.FC = () => {
     const [totalPages, setTotalPages] = useState<number>(1);
     const [total, setTotal] = useState<number>(0);
     const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+    const [searchTerm, setSearchTerm] = useState<string>('');
 
     useEffect(() => {
         const handleScroll = (): void => {
@@ -67,9 +68,11 @@ const HomePage: React.FC = () => {
             const isLoadMore: boolean = page > 1 && foods.length > 0;
             isLoadMore ? setLoadingMore(true) : setLoading(true);
             try {
-                const res = await axios.get<PaginatedResult<FoodItem>>(`${apiBase}/foods`, {
-                    params: { page, limit },
-                });
+                const params: any = { page, limit };
+                if (searchTerm.trim()) {
+                    params.name = searchTerm.trim();
+                }
+                const res = await axios.get<PaginatedResult<FoodItem>>(`${apiBase}/foods`, { params });
                 setTotalPages(res.data.totalPages);
                 setTotal(res.data.total);
                 if (isLoadMore) {
@@ -86,7 +89,7 @@ const HomePage: React.FC = () => {
 
         fetchFoods();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, limit]);
+    }, [page, limit, searchTerm]);
 
     const handleLoadMore = (): void => {
         if (page < totalPages && !loadingMore) {
@@ -98,6 +101,11 @@ const HomePage: React.FC = () => {
         const newLimit: number = Number(e.target.value);
         setLimit(newLimit);
         setPage(1);
+    };
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+        setSearchTerm(e.target.value);
+        setPage(1); // Reset về trang 1 khi search
     };
 
     return (
@@ -120,6 +128,32 @@ const HomePage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Search Bar */}
+            <div className="w-full max-w-3xl mb-8">
+                <div className="relative">
+                    <input
+                        type="text"
+                        placeholder="Tìm kiếm món ăn..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-400 transition text-lg bg-white shadow-sm"
+                    />
+                    <svg
+                        className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                    </svg>
+                </div>
+            </div>
+
             {loading && page === 1 && (
                 <div className="w-full max-w-7xl text-gray-600">Đang tải dữ liệu...</div>
             )}
@@ -128,10 +162,16 @@ const HomePage: React.FC = () => {
                 <div className="w-full max-w-7xl text-red-600">{error}</div>
             )}
 
-            {!error && (
+            {!error && foods.length === 0 && !loading && (
+                <div className="w-full max-w-7xl text-gray-500 text-center py-8">
+                    {searchTerm ? `Không tìm thấy món ăn nào với từ khóa "${searchTerm}"` : 'Không có món ăn nào'}
+                </div>
+            )}
+
+            {!error && foods.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full max-w-3xl">
                     {foods.map((item) => {
-                        const img = item.imageURL || 'https://via.placeholder.com/160x200?text=No+Image';
+                        const img = item.image_url || 'https://via.placeholder.com/160x200?text=No+Image';
                         return (
                             <div key={(item.id || item.name) + Math.random()} className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center transition hover:shadow-lg">
                                 <img src={img} alt={item.name} className="w-40 h-40 object-cover rounded-md mb-4" />
@@ -152,7 +192,7 @@ const HomePage: React.FC = () => {
             )}
 
             {/* Load more */}
-            {!loading && !error && page < totalPages && (
+            {!loading && !error && page < totalPages && foods.length > 0 && (
                 <div className="mt-10">
                     <button
                         onClick={handleLoadMore}

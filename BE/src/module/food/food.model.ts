@@ -3,6 +3,8 @@ export class Food {
     readonly id?: string;
     /** Food name */
     name: string;
+    /** Food image */
+    image_url: string;
     /** Food description */
     description: string;
     /** Food type */
@@ -11,8 +13,6 @@ export class Food {
     ingredients: string;
     /** Food recipe */
     recipe: string;
-    /** Food image */
-    imageURL: string;
     /** Food price */
     price: number;
 }
