@@ -6,30 +6,47 @@ import { ODatabase, ODatabaseSession, OrientDBClient } from 'orientjs';
 export class OrientDbService implements OnModuleInit, OnModuleDestroy {
     private client: OrientDBClient;
     private db: ODatabaseSession;
+    private binaryEnabled = false;
 
     constructor(private readonly configService: ConfigService) { }
 
     async onModuleInit(): Promise<void> {
-        this.client = await OrientDBClient.connect({
-            host: this.configService.get<string>('ORIENTDB_HOST', 'localhost'),
-            port: this.configService.get<number>('ORIENTDB_PORT', 2424),
-            pool: {
-                max: 10,
-            },
-        });
-        this.db = await this.client.session({
-            name: this.configService.get<string>('ORIENTDB_DB', 'gourmet'),
-            username: this.configService.get<string>('ORIENTDB_USER', 'root'),
-            password: this.configService.get<string>('ORIENTDB_PASSWORD', 'root'),
-        });
+        const flag = this.configService.get<string>('ORIENTDB_BINARY_ENABLED');
+        this.binaryEnabled = flag === 'true';
+        if (!this.binaryEnabled) {
+            return;
+        }
+        try {
+            this.client = await OrientDBClient.connect({
+                host: this.configService.get<string>('ORIENTDB_HOST', 'localhost'),
+                port: this.configService.get<number>('ORIENTDB_PORT', 2424),
+                pool: { max: 10 },
+            });
+            this.db = await this.client.session({
+                name: this.configService.get<string>('ORIENTDB_DB', 'gourmet'),
+                username: this.configService.get<string>('ORIENTDB_USER', 'root'),
+                password: this.configService.get<string>('ORIENTDB_PASSWORD', 'root'),
+            });
+        } catch (err) {
+            // Avoid crashing app if binary is not available
+            console.warn('[OrientDbService] Binary connection disabled or failed:', (err as Error)?.message);
+            this.binaryEnabled = false;
+        }
     }
 
     async onModuleDestroy(): Promise<void> {
-        await this.db.close();
-        await this.client.close();
+        if (this.db) {
+            await this.db.close();
+        }
+        if (this.client) {
+            await this.client.close();
+        }
     }
 
     getDb(): ODatabaseSession {
+        if (!this.binaryEnabled || !this.db) {
+            throw new Error('OrientDB binary driver is disabled or not connected. Enable by setting ORIENTDB_BINARY_ENABLED=true');
+        }
         return this.db;
     }
 
