@@ -27,7 +27,7 @@ export class GetAllFoodDto {
     /** Filter by food type */
     @IsOptional()
     @IsString()
-    type?: string;
+    calories?: string;
 
     /** Filter by price range (min) */
     @IsOptional()

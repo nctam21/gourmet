@@ -1,9 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import FoodDetail from '../components/FoodDetail';
 
 type FoodItem = {
-    id?: string;
+    '@rid': string; // OrientDB record ID (required)
     name: string;
     description: string;
     image_url?: string;
@@ -18,6 +19,22 @@ type PaginatedResult<T> = {
     page: number;
     limit: number;
     totalPages: number;
+};
+
+type TrendingFood = {
+    foodName: string;
+    foodType: string;
+    viewTrend: 'increasing' | 'decreasing' | 'stable';
+    likeTrend: 'increasing' | 'decreasing' | 'stable';
+    popularityScore: number;
+    regionDistribution: { region: string; count: number }[];
+};
+
+type RecommendationItem = {
+    foodId: string;
+    foodName: string;
+    reason: string;
+    score: number;
 };
 
 const resolveApiBase = (): string => {
@@ -47,6 +64,15 @@ const HomePage: React.FC = () => {
     const [total, setTotal] = useState<number>(0);
     const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const [selectedType, setSelectedType] = useState<string>('');
+    const [minPrice, setMinPrice] = useState<string>('');
+    const [maxPrice, setMaxPrice] = useState<string>('');
+    const [popularFoods, setPopularFoods] = useState<RecommendationItem[]>([]);
+    const [ageBasedRecs, setAgeBasedRecs] = useState<RecommendationItem[]>([]);
+    const [trendingFoods, setTrendingFoods] = useState<TrendingFood[]>([]);
+    const [selectedRegion, setSelectedRegion] = useState<string>('');
+    const [showFoodDetail, setShowFoodDetail] = useState<boolean>(false);
+    const [selectedFoodId, setSelectedFoodId] = useState<string>('');
 
     useEffect(() => {
         const handleScroll = (): void => {
@@ -72,6 +98,15 @@ const HomePage: React.FC = () => {
                 if (searchTerm.trim()) {
                     params.name = searchTerm.trim();
                 }
+                if (selectedType) {
+                    params.type = selectedType;
+                }
+                if (minPrice) {
+                    params.minPrice = Number(minPrice);
+                }
+                if (maxPrice) {
+                    params.maxPrice = Number(maxPrice);
+                }
                 const res = await axios.get<PaginatedResult<FoodItem>>(`${apiBase}/foods`, { params });
                 setTotalPages(res.data.totalPages);
                 setTotal(res.data.total);
@@ -87,9 +122,28 @@ const HomePage: React.FC = () => {
             }
         };
 
+        const fetchRecommendations = async (): Promise<void> => {
+            try {
+                // Fetch popular foods
+                const popularRes = await axios.get<RecommendationItem[]>(`${apiBase}/food-recommendations/most-viewed?limit=6`);
+                setPopularFoods(popularRes.data);
+
+                // Fetch age-based recommendations (assuming user age 25)
+                const ageRes = await axios.get<RecommendationItem[]>(`${apiBase}/food-recommendations/age-based?userAge=25`);
+                setAgeBasedRecs(ageRes.data);
+
+                // Fetch trending foods
+                const trendingRes = await axios.get<TrendingFood[]>(`${apiBase}/food-analytics/trends?days=30`);
+                setTrendingFoods(trendingRes.data);
+            } catch (err) {
+                console.warn('Failed to fetch recommendations:', err);
+            }
+        };
+
         fetchFoods();
+        fetchRecommendations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, limit, searchTerm]);
+    }, [page, limit, searchTerm, selectedType, minPrice, maxPrice]);
 
     const handleLoadMore = (): void => {
         if (page < totalPages && !loadingMore) {
@@ -105,7 +159,32 @@ const HomePage: React.FC = () => {
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
         setSearchTerm(e.target.value);
-        setPage(1); // Reset về trang 1 khi search
+        setPage(1);
+    };
+
+    const handleFilterChange = (): void => {
+        setPage(1);
+    };
+
+    const clearFilters = (): void => {
+        setSearchTerm('');
+        setSelectedType('');
+        setMinPrice('');
+        setMaxPrice('');
+        setSelectedRegion('');
+        setPage(1);
+    };
+
+    const handleFoodClick = (foodId: string): void => {
+        console.log('handleFoodClick called with foodId:', foodId); // Debug log
+        setSelectedFoodId(foodId);
+        setShowFoodDetail(true);
+        console.log('State updated - selectedFoodId:', foodId, 'showFoodDetail:', true); // Debug log
+    };
+
+    const closeFoodDetail = (): void => {
+        setShowFoodDetail(false);
+        setSelectedFoodId('');
     };
 
     return (
@@ -154,6 +233,205 @@ const HomePage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Advanced Filters */}
+            <div className="w-full max-w-3xl mb-8">
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Bộ lọc nâng cao</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Loại món ăn</label>
+                            <select
+                                value={selectedType}
+                                onChange={(e) => { setSelectedType(e.target.value); handleFilterChange(); }}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            >
+                                <option value="">Tất cả loại</option>
+                                <option value="món chính">Món chính</option>
+                                <option value="món phụ">Món phụ</option>
+                                <option value="tráng miệng">Tráng miệng</option>
+                                <option value="đồ uống">Đồ uống</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Giá tối thiểu (VNĐ)</label>
+                            <input
+                                type="number"
+                                placeholder="0"
+                                value={minPrice}
+                                onChange={(e) => { setMinPrice(e.target.value); handleFilterChange(); }}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Giá tối đa (VNĐ)</label>
+                            <input
+                                type="number"
+                                placeholder="1000000"
+                                value={maxPrice}
+                                onChange={(e) => { setMaxPrice(e.target.value); handleFilterChange(); }}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Additional Filters */}
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Khu vực</label>
+                            <select
+                                value={selectedRegion}
+                                onChange={(e) => { setSelectedRegion(e.target.value); handleFilterChange(); }}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            >
+                                <option value="">Tất cả khu vực</option>
+                                <option value="Trung du và miền núi phía Bắc">Trung du và miền núi phía Bắc</option>
+                                <option value="Đồng Bằng Sông Hồng">Đồng Bằng Sông Hồng</option>
+                                <option value="Bắc Trung Bộ">Bắc Trung Bộ</option>
+                                <option value="Duyên Hải Nam Trung Bộ">Duyên Hải Nam Trung Bộ</option>
+                                <option value="Tây Nguyên">Tây Nguyên</option>
+                                <option value="Đông Nam Bộ">Đông Nam Bộ</option>
+                                <option value="Đồng Bằng Sông Cửu Long">Đồng Bằng Sông Cửu Long</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                        <button
+                            onClick={clearFilters}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition"
+                        >
+                            Xóa bộ lọc
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Trending Section */}
+            {trendingFoods.length > 0 && (
+                <div className="w-full max-w-7xl mb-8">
+                    <div className="bg-white p-6 rounded-xl shadow-md">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">📈 Món ăn trending</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {trendingFoods.slice(0, 8).map((food, index) => (
+                                <div
+                                    key={index}
+                                    className="bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => {
+                                        // Tìm food RID từ danh sách foods
+                                        const foundFood = foods.find(f => f.name === food.foodName);
+                                        const foodId = foundFood?.['@rid'];
+                                        if (foodId) {
+                                            console.log('Trending food clicked, RID:', foodId);
+                                            handleFoodClick(foodId);
+                                        } else {
+                                            console.log('No food RID found for trending food:', food.foodName);
+                                            alert(`Không thể mở chi tiết cho món trending: ${food.foodName}`);
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-medium text-gray-800">{food.foodName}</span>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                            #{index + 1}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mb-2">{food.foodType}</div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <span className={`px-2 py-1 rounded ${food.viewTrend === 'increasing' ? 'bg-green-100 text-green-800' :
+                                            food.viewTrend === 'decreasing' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`}>
+                                            👁️ {food.viewTrend}
+                                        </span>
+                                        <span className={`px-2 py-1 rounded ${food.likeTrend === 'increasing' ? 'bg-green-100 text-green-800' :
+                                            food.likeTrend === 'decreasing' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`}>
+                                            ❤️ {food.likeTrend}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-2">
+                                        Điểm: {food.popularityScore}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recommendations Section */}
+            {(popularFoods.length > 0 || ageBasedRecs.length > 0) && (
+                <div className="w-full max-w-7xl mb-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Popular Foods */}
+                        {popularFoods.length > 0 && (
+                            <div className="bg-white p-6 rounded-xl shadow-md">
+                                <h3 className="text-xl font-semibold text-gray-800 mb-4">🔥 Món ăn phổ biến nhất</h3>
+                                <div className="space-y-3">
+                                    {popularFoods.map((item) => (
+                                        <div
+                                            key={item.foodId}
+                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                            onClick={() => {
+                                                // Tìm food RID từ danh sách foods
+                                                const foundFood = foods.find(f => f.name === item.foodName);
+                                                const foodId = foundFood?.['@rid'];
+                                                if (foodId) {
+                                                    console.log('Popular food clicked, RID:', foodId);
+                                                    handleFoodClick(foodId);
+                                                } else {
+                                                    console.log('No food RID found for popular food:', item.foodName);
+                                                    alert(`Không thể mở chi tiết cho món phổ biến: ${item.foodName}`);
+                                                }
+                                            }}
+                                        >
+                                            <div>
+                                                <div className="font-medium text-gray-800">{item.foodName}</div>
+                                                <div className="text-sm text-gray-600">{item.reason}</div>
+                                            </div>
+                                            <div className="text-sm text-gray-500">Điểm: {item.score}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Age-based Recommendations */}
+                        {ageBasedRecs.length > 0 && (
+                            <div className="bg-white p-6 rounded-xl shadow-md">
+                                <h3 className="text-xl font-semibold text-gray-800 mb-4">👥 Gợi ý theo độ tuổi</h3>
+                                <div className="space-y-3">
+                                    {ageBasedRecs.map((item) => (
+                                        <div
+                                            key={item.foodId}
+                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                            onClick={() => {
+                                                // Tìm food RID từ danh sách foods
+                                                const foundFood = foods.find(f => f.name === item.foodName);
+                                                const foodId = foundFood?.['@rid'];
+                                                if (foodId) {
+                                                    handleFoodClick(foodId);
+                                                } else {
+                                                    console.log('No food RID found for age-based food:', item.foodName);
+                                                    alert(`Không thể mở chi tiết cho món gợi ý: ${item.foodName}`);
+                                                }
+                                            }}
+                                        >
+                                            <div>
+                                                <div className="font-medium text-gray-800">{item.foodName}</div>
+                                                <div className="text-sm text-gray-600">{item.reason}</div>
+                                            </div>
+                                            <div className="text-sm text-gray-500">Điểm: {item.score}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {loading && page === 1 && (
                 <div className="w-full max-w-7xl text-gray-600">Đang tải dữ liệu...</div>
             )}
@@ -164,7 +442,9 @@ const HomePage: React.FC = () => {
 
             {!error && foods.length === 0 && !loading && (
                 <div className="w-full max-w-7xl text-gray-500 text-center py-8">
-                    {searchTerm ? `Không tìm thấy món ăn nào với từ khóa "${searchTerm}"` : 'Không có món ăn nào'}
+                    {searchTerm || selectedType || minPrice || maxPrice || selectedRegion
+                        ? `Không tìm thấy món ăn nào với bộ lọc hiện tại`
+                        : 'Không có món ăn nào'}
                 </div>
             )}
 
@@ -172,14 +452,27 @@ const HomePage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full max-w-3xl">
                     {foods.map((item) => {
                         const img = item.image_url || 'https://via.placeholder.com/160x200?text=No+Image';
+
+                        const foodId = item['@rid'];
+
                         return (
-                            <div key={(item.id || item.name) + Math.random()} className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center transition hover:shadow-lg">
+                            <div
+                                key={(foodId || item.name) + Math.random()}
+                                className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center transition hover:shadow-lg cursor-pointer"
+                                onClick={() => {
+                                    if (foodId) {
+                                        handleFoodClick(foodId);
+                                    } else {
+                                        console.log('No food RID found for:', item.name); // Debug log
+                                        alert(`Không thể mở chi tiết cho món: ${item.name}. Vui lòng thử lại sau.`);
+                                    }
+                                }}
+                            >
                                 <img src={img} alt={item.name} className="w-40 h-40 object-cover rounded-md mb-4" />
                                 <h2 className="text-xl font-semibold text-gray-800 mb-1 text-center">{item.name}</h2>
                                 {item.region && (
                                     <div className="text-xs text-gray-500 mb-2">{item.region}</div>
                                 )}
-                                <p className="text-gray-500 text-sm mb-4 text-center min-h-[40px]">{item.description}</p>
                                 {typeof item.price === 'number' && (
                                     <div className="text-lg font-bold text-gray-700 mt-auto">
                                         {item.price.toLocaleString('vi-VN')} đ
@@ -215,6 +508,21 @@ const HomePage: React.FC = () => {
                     <polyline points="18 15 12 9 6 15"></polyline>
                 </svg>
             </button>
+
+            {/* Food Detail Modal */}
+            {showFoodDetail && selectedFoodId && (
+                <FoodDetail
+                    foodRid={selectedFoodId}
+                    onClose={closeFoodDetail}
+                />
+            )}
+
+            {/* Debug info for modal state */}
+            <div className="fixed bottom-20 right-6 bg-black text-white p-2 rounded text-xs z-50">
+                showFoodDetail: {showFoodDetail.toString()}<br />
+                selectedFoodId: {selectedFoodId || 'null'}
+            </div>
+
         </div>
     );
 };
