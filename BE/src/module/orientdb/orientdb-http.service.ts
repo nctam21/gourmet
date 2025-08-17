@@ -45,13 +45,39 @@ export class OrientDbHttpService {
 
     /** Execute a SQL command (POST /command/{db}/sql) - send raw SQL text body */
     async command<T>(sql: string): Promise<T | null> {
-        const { data } = await this.client.post(
-            `/command/${this.dbName}/sql`,
-            sql,
-            { headers: { 'Content-Type': 'text/plain' } },
-        );
-        const result = (data?.result ?? [])[0] ?? null;
-        return result as T | null;
+        try {
+            const { data } = await this.client.post(
+                `/command/${this.dbName}/sql`,
+                sql,
+                { headers: { 'Content-Type': 'text/plain' } },
+            );
+            const result = (data?.result ?? [])[0] ?? null;
+            return result as T | null;
+        } catch (error) {
+            console.error(`[OrientDbHttpService] Command failed:`, {
+                sql,
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            throw error;
+        }
+    }
+
+    /** Delete a document by RID (DELETE /document/{db}/{rid}) */
+    async deleteDocument<T>(rid: string): Promise<T | null> {
+        try {
+            const { data } = await this.client.delete(`/document/${this.dbName}/${encodeURIComponent(rid)}`);
+            return (data ?? null) as T | null;
+        } catch (error) {
+            console.error(`[OrientDbHttpService] Delete document failed:`, {
+                rid,
+                error: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            throw error;
+        }
     }
 
     /** Fetch a single document by RID (GET /document/{db}/{rid}) */

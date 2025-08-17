@@ -1,6 +1,6 @@
 export class Food {
-    /** OrientDB record id */
-    readonly id?: string;
+    /** OrientDB record id (@rid) */
+    readonly '@rid'?: string;
     /** Food name */
     name: string;
     /** Food image */
@@ -15,4 +15,6 @@ export class Food {
     recipe: string;
     /** Food price */
     price: number;
+    /** Food view count */
+    view_count?: string;
 }
