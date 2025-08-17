@@ -33,11 +33,11 @@ export class FoodRecommendationController {
 
     /**
      * 3. Món ăn có lượt xem cao nhất
-     * GET /food-recommendations/most-viewed?limit=10
+     * GET /food-recommendations/most-viewed?limit=6
      */
     @Get('most-viewed')
     async getMostViewedFoods(
-        @Query('limit', ParseIntPipe) limit: number = 10
+        @Query('limit', ParseIntPipe) limit: number = 6
     ): Promise<FoodRecommendation[]> {
         return this.foodRecommendationService.getMostViewedFoods(limit);
     }

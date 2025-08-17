@@ -1,5 +1,27 @@
 # 🐛 Debug Food API - Lỗi 500
 
+## 🔍 **Bước 0: Kiểm tra Admin Dashboard (Mới)**
+
+```bash
+curl -X GET "http://localhost:3000/foods/admin"
+```
+
+**Kết quả mong đợi:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "endpoints": ["GET /foods", "GET /foods/:rid", ...],
+  "database": { "success": true, "message": "Database connection successful" },
+  "cache": { "totalEntries": 0, "cacheSize": 300000, ... },
+  "version": "1.0.0"
+}
+```
+
+**Nếu fail:** Vấn đề ở server hoặc routing
+
+---
+
 ## 🔍 **Bước 1: Kiểm tra Database Connection**
 
 ```bash
@@ -42,7 +64,7 @@ curl -X GET "http://localhost:3000/foods/test/view-count/18:2214"
 
 ---
 
-## 🔍 **Bước 3: Test Manual View Count Increment**
+## 🔍 **Bước 3: Test Manual Increment**
 
 ```bash
 curl -X POST "http://localhost:3000/foods/18:2214/increment-view"
@@ -58,6 +80,55 @@ curl -X POST "http://localhost:3000/foods/18:2214/increment-view"
 ```
 
 **Nếu fail:** Vấn đề ở UPDATE query
+
+---
+
+## 🔍 **Bước 3.5: Test DELETE Operation (Mới)**
+
+```bash
+curl -X GET "http://localhost:3000/foods/test/delete/19:2315"
+```
+
+**Kết quả mong đợi:**
+```json
+{
+  "foodRid": "19:2315",
+  "exists": true,
+  "foodInfo": {
+    "@rid": "#19:2315",
+    "name": "Tên món ăn",
+    "type": "Loại",
+    "price": 50000
+  },
+  "canDelete": true,
+  "message": "Food can be deleted"
+}
+```
+
+**Nếu fail:** Vấn đề ở quyền DELETE hoặc food không tồn tại
+
+---
+
+## 🔍 **Bước 3.6: Test DELETE Operation với Logging (Mới)**
+
+```bash
+curl -X POST "http://localhost:3000/foods/test/delete-with-log/19:2315"
+```
+
+**Kết quả mong đợi:**
+```json
+{
+  "foodRid": "19:2315",
+  "success": true,
+  "message": "DELETE operation successful via document endpoint",
+  "details": {
+    "result": {...},
+    "deletedFood": {...}
+  }
+}
+```
+
+**Nếu fail:** Vấn đề ở OrientDB REST API hoặc quyền DELETE
 
 ---
 

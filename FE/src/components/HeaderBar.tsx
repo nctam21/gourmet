@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { FaUserCircle } from 'react-icons/fa';
 import axios from 'axios';
 
 type PopularFood = {
-    foodId: string;
-    foodName: string;
-    reason: string;
-    score: number;
+    '@rid': string;
+    name: string;
+    image_url?: string;
+    view_count?: number;
+    like_count?: number;
 };
 
 type FoodType = {
@@ -49,20 +49,34 @@ const HeaderBar: React.FC = () => {
                 const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:3000';
 
                 // Fetch popular foods
-                const popularRes = await axios.get<PopularFood[]>(`${apiBase}/food-recommendations/most-viewed?limit=5`);
-                setPopularFoods(popularRes.data);
+                const popularRes = await axios.get<any>(`${apiBase}/foods?page=1&limit=5&sortBy=view_count&sortOrder=desc`);
+                if (popularRes.data.items) {
+                    setPopularFoods(popularRes.data.items);
+                }
 
                 // Fetch food types with count
-                const typesRes = await axios.get<FoodType[]>(`${apiBase}/food-analytics/statistics`);
-                setFoodTypes(typesRes.data);
+                const typesRes = await axios.get<any>(`${apiBase}/foods?page=1&limit=100`);
+                if (typesRes.data.items) {
+                    const typeCounts = typesRes.data.items.reduce((acc: any, food: any) => {
+                        if (food.type) {
+                            acc[food.type] = (acc[food.type] || 0) + 1;
+                        }
+                        return acc;
+                    }, {});
+
+                    const typesArray = Object.entries(typeCounts).map(([type, count]) => ({
+                        type,
+                        count: count as number
+                    }));
+                    setFoodTypes(typesArray);
+                }
             } catch (err) {
-                console.warn('Failed to fetch menu data:', err);
+                console.error('Error fetching menu data:', err);
                 // Fallback to default menu items
                 setFoodTypes([
-                    { type: 'món chính', count: 0 },
-                    { type: 'món phụ', count: 0 },
-                    { type: 'tráng miệng', count: 0 },
-                    { type: 'đồ uống', count: 0 }
+                    { type: 'Món chính', count: 0 },
+                    { type: 'Món phụ', count: 0 },
+                    { type: 'Tráng miệng', count: 0 }
                 ]);
             } finally {
                 setLoading(false);
@@ -77,64 +91,84 @@ const HeaderBar: React.FC = () => {
             <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-2">
                 {/* Logo */}
                 <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-gray-900 tracking-tight">🍏</span>
+                    <img src={'/logo.png'} alt="logo" className="w-10 h-10 object-cover" />
                 </div>
 
-                {/* Menu */}
-                <nav className="flex-1 flex justify-center">
-                    <ul className="flex gap-6">
-                        {/* Popular Foods Menu */}
-                        {popularFoods.length > 0 && (
-                            <li className="relative group">
-                                <button className="text-gray-700 text-sm font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors">
-                                    🔥 Phổ biến nhất
-                                </button>
-                                {/* Dropdown for popular foods */}
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                    <div className="p-3">
-                                        <h4 className="font-semibold text-gray-800 mb-2">Món ăn phổ biến</h4>
-                                        <div className="space-y-2">
-                                            {popularFoods.map((food) => (
-                                                <div key={food.foodId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                                    <div>
-                                                        <div className="font-medium text-sm text-gray-800">{food.foodName}</div>
-                                                        <div className="text-xs text-gray-600">{food.reason}</div>
-                                                    </div>
-                                                    <div className="text-xs text-gray-500">Điểm: {food.score}</div>
+                {/* Navigation Menu */}
+                <nav className="hidden md:flex items-center space-x-8">
+                    <Link
+                        to="/main"
+                        className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                        🏠
+                        Trang chủ
+                    </Link>
+
+                    {/* Chỉ hiển thị nút Quản lý món ăn khi user là admin */}
+                    {user && user.name === 'admin' && (
+                        <Link
+                            to="/admin"
+                            className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                            🍽️
+                            Quản lý món ăn
+                        </Link>
+                    )}
+
+                    {/* Most Popular Foods */}
+                    {popularFoods.length > 0 && (
+                        <div className="relative group">
+                            <button className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
+                                🔥
+                                Món phổ biến
+                            </button>
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="p-4">
+                                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Món ăn phổ biến nhất</h3>
+                                    <div className="space-y-2">
+                                        {popularFoods.slice(0, 5).map((food, index) => (
+                                            <div key={index} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                                                <img
+                                                    src={food.image_url || 'https://via.placeholder.com/32x32?text=No+Image'}
+                                                    alt={food.name}
+                                                    className="w-8 h-8 rounded-lg object-cover"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 truncate">{food.name}</p>
+                                                    <p className="text-xs text-gray-500">👁️ {food.view_count || 0} ❤️ {food.like_count || 0}</p>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            </li>
-                        )}
+                            </div>
+                        </div>
+                    )}
 
-                        {/* Food Types Menu */}
-                        {foodTypes.map((type) => (
-                            <li key={type.type} className="relative group">
-                                <button className="text-gray-700 text-sm font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors">
-                                    {type.type}
-                                    {type.count > 0 && (
-                                        <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                            {type.count}
-                                        </span>
-                                    )}
-                                </button>
-                            </li>
-                        ))}
-
-                        {/* Static Menu Items */}
-                        <li>
-                            <button className="text-gray-700 text-sm font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors">
-                                Cửa hàng
+                    {/* Food Types */}
+                    {foodTypes.length > 0 && (
+                        <div className="relative group">
+                            <button className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
+                                📊
+                                Loại món ăn
                             </button>
-                        </li>
-                        <li>
-                            <button className="text-gray-700 text-sm font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors">
-                                Hỗ trợ
-                            </button>
-                        </li>
-                    </ul>
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="p-4">
+                                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Các loại món ăn</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {foodTypes.slice(0, 8).map((type, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium text-center"
+                                            >
+                                                {type.type} ({type.count})
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </nav>
 
                 {/* User/Action */}
@@ -145,7 +179,7 @@ const HeaderBar: React.FC = () => {
                                 onClick={() => setShowMenu((v) => !v)}
                                 className="focus:outline-none"
                             >
-                                <FaUserCircle size={32} color="#374151" />
+                                👤
                             </button>
                             {showMenu && (
                                 <ul className="absolute right-0 mt-2 w-90 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
@@ -170,11 +204,11 @@ const HeaderBar: React.FC = () => {
                         <div className="flex space-x-4">
                             <button
                                 className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 hover:text-white transition"
-                                onClick={() => navigate('/auth')}
+                                onClick={() => navigate('/')}
                             >
                                 Đăng nhập
                             </button>
-                            <button className="bg-white-500 text-gray-600 px-4 py-2 rounded hover:bg-gray-600 hover:text-white transition" onClick={() => navigate('/auth')}>
+                            <button className="bg-white-500 text-gray-600 px-4 py-2 rounded hover:bg-gray-600 hover:text-white transition" onClick={() => navigate('/')}>
                                 Đăng ký
                             </button>
                         </div>

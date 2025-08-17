@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 interface User {
     name: string;
     email: string;
+    age: number;
     [key: string]: any;
 }
 

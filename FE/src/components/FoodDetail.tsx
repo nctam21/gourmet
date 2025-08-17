@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 type FoodDetailData = {
@@ -24,16 +24,23 @@ const FoodDetail: React.FC<FoodDetailProps> = ({ foodRid, onClose }) => {
     const [food, setFood] = useState<FoodDetailData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
+    const isFetchingRef = useRef(false);
 
     useEffect(() => {
         const fetchFoodDetail = async () => {
+            if (isFetchingRef.current) {
+                return;
+            }
+
             try {
+                isFetchingRef.current = true;
                 setLoading(true);
                 const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:3000';
 
                 // Fetch food detail
                 // Bỏ dấu # từ foodRid trước khi gọi API
                 const rid = foodRid.replace('#', '');
+                console.log('Fetching food detail for RID:', rid); // Debug log
                 const foodRes = await axios.get<any>(`${apiBase}/foods/${rid}`);
 
                 // BE trả về paginated list, lấy item đầu tiên
@@ -51,6 +58,7 @@ const FoodDetail: React.FC<FoodDetailProps> = ({ foodRid, onClose }) => {
                 setError(err.response?.data?.message || 'Failed to load food details');
             } finally {
                 setLoading(false);
+                isFetchingRef.current = false;
             }
         };
 
